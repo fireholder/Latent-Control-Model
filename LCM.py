@@ -219,6 +219,7 @@ class GridModel(BaseModel):
         return (gamma*gamma.log()).mean()
 
 
+
 class LatentControlModel(GridModel):
     def __init__(self, num_grid, num_stack, action_space_n, obs_size, ob_bound, model_structure, is_action_conditional, random_noise_frame=True, epsilon=1.0, C_keepsum=False, loss_transition_each=False, loss_transition_entropy=False):
         super(LatentControlModel, self).__init__(num_grid, num_stack, action_space_n, obs_size)
@@ -235,7 +236,6 @@ class LatentControlModel(GridModel):
         self.conved_size = self.model_structure['conved_shape'][0]*self.model_structure['conved_shape'][1]*self.model_structure['conved_shape'][2]
 
         self.Phi_conv = nn.Sequential(
-
             self.leakrelu_init_(nn.Conv2d(self.num_stack, *self.model_structure['conv_0'][1:])),
             nn.BatchNorm2d(self.model_structure['conv_0'][1]),
             nn.LeakyReLU(inplace=True),
@@ -245,14 +245,16 @@ class LatentControlModel(GridModel):
             nn.LeakyReLU(inplace=True),
 
             Flatten(),
-
-            self.leakrelu_init_(nn.Linear(self.conved_size, self.model_structure['linear_size'])),
-            nn.BatchNorm1d(self.model_structure['linear_size']),
-            nn.LeakyReLU(inplace=True),
+            # TODO 
+            # self.leakrelu_init_(nn.Linear(self.conved_size, self.model_structure['linear_size'])),
+            # nn.BatchNorm1d(self.model_structure['linear_size']),
+            # nn.LeakyReLU(inplace=True),
         )
 
         self.Phi_coordinate_linear = nn.Sequential(
-            self.linear_init_(nn.Linear(self.relative_coordinates_size, self.model_structure['linear_size'])),
+            # TODO
+            # self.linear_init_(nn.Linear(self.relative_coordinates_size, self.model_structure['linear_size'])),
+            self.linear_init_(nn.Linear(self.relative_coordinates_size, self.model_structure['linear_size']//2)),
             #
             #
         )
@@ -374,12 +376,14 @@ class LatentControlModel(GridModel):
                 self.Phi_action_linear(onehot_actions)
             )
         else:
+            phi = self.Phi_conv(last_states)*self.Phi_coordinate_linear(coordinates)
+            '''
             phi = self.Phi_deconv(
                 self.Phi_conv(last_states)
                 *
                 self.Phi_coordinate_linear(coordinates)
             )
-
+            '''
         '''(batch_size*to_each_grid*from_each_grid, ...) - > (batch_size*to_each_grid, from_each_grid, ...)'''
         phi = self.extract_grid_axis_from_batch_axis(phi)
 
@@ -449,7 +453,6 @@ class LatentControlModel(GridModel):
 
         '''(batch_size*to_each_grid, from_each_grid) -> (batch_size, to_each_grid, from_each_grid)'''
         gamma = self.extract_grid_axis_from_batch_axis(gamma)                       # TODO
-        ipdb.set_trace()
 
         '''(batch_size, from_each_grid) -> (batch_size, to_each_grid, from_each_grid)'''
         C = self.repeat_on_each_grid_axis(C, int(self.num_grid**2))
@@ -472,7 +475,6 @@ class LatentControlModel(GridModel):
             last_states = last_states,
             onehot_actions = onehot_actions,
         )
-
         '''(batch_size*to_each_grid*from_each_grid, ...) -> (batch_size*to_each_grid, from_each_grid, ...)'''
         phi = self.get_phi(
             last_states = last_states,

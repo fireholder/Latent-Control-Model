@@ -71,7 +71,7 @@ def get_args():
                     'conv_1': (1, 1, 1, 1),
                     # (8-4)/1+1 = 5
                     'conved_shape': (1, 1, 1),
-                    'linear_size': 64,
+                    'linear_size': 4,
                 },
                 'LatentControlModel': {
                     # 84/7 = 12
@@ -80,7 +80,7 @@ def get_args():
                     'conv_1': (1, 1, 1, 1),
                     # (8-4)/1+1 = 5
                     'conved_shape': (1, 1, 1),
-                    'linear_size': 1024,
+                    'linear_size': 2,
                     'deconv_0': (1, 1, 1, 1),
                     # (5−1)×1+4 = 8
                     'deconv_1': (1, 1, 1, 1),
