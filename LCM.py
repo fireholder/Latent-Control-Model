@@ -87,14 +87,17 @@ class GridModel(BaseModel):
         self.coordinates = {}
         self.relative_coordinates = {}
 
-        self.coordinates_size = int((self.num_grid)**2)
-        self.relative_coordinates_size = int((self.num_grid*2-1)**2)
+        # self.coordinates_size = int((self.num_grid)**2)
+        self.coordinates_size = int((self.num_grid))
+        # self.relative_coordinates_size = int((self.num_grid*2-1)**2)
+        self.relative_coordinates_size = int((self.num_grid*2-1))
 
     def slice_grid(self, states, i, j):
         '''
         (batch_size, feature, height, width) -> (batch_size, feature, size_grid, size_grid)
         '''
         return states[:,:,i*self.size_grid:(i+1)*self.size_grid,j*self.size_grid:(j+1)*self.size_grid]
+        # return states[:,:,j*self.size_grid:(j+1)*self.size_grid]
 
     def deslice_grid(self, states, i, j, desliced_states):
         '''
@@ -107,7 +110,8 @@ class GridModel(BaseModel):
         (batch_size, self.obs_size, self.obs_size) -> (batch_size, each_grid, num_channels*self.size_grid**2)
         '''
         grided_states = []
-        for i in range(self.num_grid):
+        # for i in range(self.num_grid):
+        for i in range(1):
             for j in range(self.num_grid):
                 temp = self.slice_grid(states,i,j)
                 if is_flatten:
@@ -144,7 +148,8 @@ class GridModel(BaseModel):
         batch_size = states.size()[0]
         if batch_size not in self.coordinates.keys():
             coordinates = []
-            for i in range(self.num_grid):
+            # for i in range(self.num_grid):
+            for i in range(1):
                 for j in range(self.num_grid):
 
                     temp = torch.zeros(batch_size,self.coordinates_size).cuda()
@@ -152,7 +157,6 @@ class GridModel(BaseModel):
                     temp[:,(i*self.num_grid+j)].fill_(1.0)
 
                     coordinates += [temp.unsqueeze(1)]
-
             coordinates = torch.cat(coordinates,1)
             self.coordinates[batch_size] = coordinates
         return self.coordinates[batch_size]
@@ -164,7 +168,8 @@ class GridModel(BaseModel):
         batch_size = states.size()[0]
         if batch_size not in self.relative_coordinates.keys():
             coordinates = []
-            for i in range(self.num_grid):
+            # for i in range(self.num_grid):
+            for i in range(1):
                 for j in range(self.num_grid):
 
                     temp = torch.zeros(batch_size,self.relative_coordinates_size).cuda()
@@ -175,10 +180,12 @@ class GridModel(BaseModel):
                         i_base = base_coordinate_tamp // self.num_grid # 0-3
                         j_base = base_coordinate_tamp % self.num_grid # 0-3
 
-                        relative_i = (i-i_base+(self.num_grid-1)) # 0-6
+                        # relative_i = (i-i_base+(self.num_grid-1)) # 0-6
+                        relative_i = (i-i_base+(1-1)) # 0-6
                         relative_j = (j-j_base+(self.num_grid-1)) # 0-6
 
-                        posi = int(relative_i*(self.num_grid*2-1)+relative_j)
+                        # posi = int(relative_i*(self.num_grid*2-1)+relative_j)
+                        posi = int(relative_i*(1*2-1)+relative_j)
 
                         temp[b,posi].fill_(1.0)
 
@@ -197,8 +204,16 @@ class GridModel(BaseModel):
         '''
             (batch_size * each_grid, ...) -> (batch_size, each_grid, ...)
         '''
-        return x.view(int(x.size()[0]/(self.num_grid**2)),int(self.num_grid**2),*x.size()[1:])
+        # return x.view(int(x.size()[0]/(self.num_grid**2)),int(self.num_grid**2),*x.size()[1:])
+        return x.view(int(x.size()[0]/(self.num_grid)),int(self.num_grid),*x.size()[1:])
 
+    def extract_grid_axis_from_batch_axis2(self, x):
+        '''
+            (batch_size * each_grid, ...) -> (batch_size, each_grid, ...)
+        '''
+        # return x.view(int(x.size()[0]/(self.num_grid**2)),int(self.num_grid**2),*x.size()[1:])
+        return x.view(int(x.size()[0]/(self.num_grid)),int(self.num_grid),*x.size()[1:])
+    
     def repeat_on_each_grid_axis(self, x, repeat_times):
         '''
             (batch_size, ...) -> (batch_size, each_grid, ...)
@@ -246,15 +261,15 @@ class LatentControlModel(GridModel):
 
             Flatten(),
             # TODO 
-            # self.leakrelu_init_(nn.Linear(self.conved_size, self.model_structure['linear_size'])),
-            # nn.BatchNorm1d(self.model_structure['linear_size']),
-            # nn.LeakyReLU(inplace=True),
+            self.leakrelu_init_(nn.Linear(self.conved_size, self.model_structure['linear_size'])),
+            nn.BatchNorm1d(self.model_structure['linear_size']),
+            nn.LeakyReLU(inplace=True),
         )
 
         self.Phi_coordinate_linear = nn.Sequential(
             # TODO
-            # self.linear_init_(nn.Linear(self.relative_coordinates_size, self.model_structure['linear_size'])),
-            self.linear_init_(nn.Linear(self.relative_coordinates_size, self.model_structure['linear_size']//2)),
+            self.linear_init_(nn.Linear(self.relative_coordinates_size, self.model_structure['linear_size'])),
+            # self.linear_init_(nn.Linear(self.relative_coordinates_size, self.model_structure['linear_size']//2)),
             #
             #
         )
@@ -331,7 +346,8 @@ class LatentControlModel(GridModel):
 
     def randomize_noise_masks(self, batch_size):
         if batch_size not in self.noise_masks.keys():
-            self.noise_masks[batch_size] = torch.zeros(batch_size,1,self.obs_size,self.obs_size).cuda()
+            # self.noise_masks[batch_size] = torch.zeros(batch_size,1,self.obs_size,self.obs_size).cuda()
+            self.noise_masks[batch_size] = torch.zeros(batch_size,1,1,self.obs_size).cuda()
         self.noise_masks[batch_size].uniform_(-1.0,1.0).sign_().mul_(self.epsilon)
 
     def add_noise_masks(self,x):
@@ -356,7 +372,6 @@ class LatentControlModel(GridModel):
                 *
                 self.Gamma_coordinate_linear(coordinates)
             )
-
         '''(batch_size*to_each_grid*from_each_grid, 1)  -> (batch_size*to_each_grid, from_each_grid, 1)'''
         gamma_bar = self.extract_grid_axis_from_batch_axis(gamma_bar)
         '''(batch_size*to_each_grid, from_each_grid, 1) -> (batch_size*to_each_grid, from_each_grid)'''
@@ -376,14 +391,12 @@ class LatentControlModel(GridModel):
                 self.Phi_action_linear(onehot_actions)
             )
         else:
-            phi = self.Phi_conv(last_states)*self.Phi_coordinate_linear(coordinates)
-            '''
+            # phi = self.Phi_conv(last_states)*self.Phi_coordinate_linear(coordinates)
             phi = self.Phi_deconv(
                 self.Phi_conv(last_states)
                 *
                 self.Phi_coordinate_linear(coordinates)
             )
-            '''
         '''(batch_size*to_each_grid*from_each_grid, ...) - > (batch_size*to_each_grid, from_each_grid, ...)'''
         phi = self.extract_grid_axis_from_batch_axis(phi)
 
@@ -396,8 +409,10 @@ class LatentControlModel(GridModel):
         '''(batch_size, ...) -> (batch_size, to_each_grid, ...)'''
         base_coordinates = self.get_absolute_coordinates(now_states)
         now_states       = self.grid_states(now_states, is_flatten = False)
-        last_states      = self.repeat_on_each_grid_axis(last_states   , int(self.num_grid**2))
-        onehot_actions   = self.repeat_on_each_grid_axis(onehot_actions, int(self.num_grid**2))
+        # last_states      = self.repeat_on_each_grid_axis(last_states   , int(self.num_grid**2))
+        # onehot_actions   = self.repeat_on_each_grid_axis(onehot_actions, int(self.num_grid**2))
+        last_states      = self.repeat_on_each_grid_axis(last_states   , int(self.num_grid))
+        onehot_actions   = self.repeat_on_each_grid_axis(onehot_actions, int(self.num_grid))
 
         '''(batch_size, to_each_grid, ...) -> (batch_size*to_each_grid, ...)'''
         base_coordinates = self.put_grid_axis_to_batch_axis(base_coordinates    )
@@ -408,9 +423,11 @@ class LatentControlModel(GridModel):
 
         '''(batch_size*to_each_grid, ...) -> (batch_size*to_each_grid, from_each_grid, ...)'''
         relative_coordinates = self.get_relative_coordinates(last_states, base_coordinates)
-        now_states           = self.repeat_on_each_grid_axis(now_states    , int(self.num_grid**2))
+        # now_states           = self.repeat_on_each_grid_axis(now_states    , int(self.num_grid**2))
+        now_states           = self.repeat_on_each_grid_axis(now_states    , int(self.num_grid))
         last_states          = self.grid_states(last_states, is_flatten=False)
-        onehot_actions       = self.repeat_on_each_grid_axis(onehot_actions, int(self.num_grid**2))
+        # onehot_actions       = self.repeat_on_each_grid_axis(onehot_actions, int(self.num_grid**2))
+        onehot_actions       = self.repeat_on_each_grid_axis(onehot_actions, int(self.num_grid))
 
 
         '''(batch_size*to_each_grid, from_each_grid, ...) -> (batch_size*to_each_grid*from_each_grid, ...)'''
@@ -488,9 +505,7 @@ class LatentControlModel(GridModel):
             coordinates = relative_coordinates,
             onehot_actions = onehot_actions,
         )
-        ipdb.set_trace()
-        test_gamma = self.extract_grid_axis_from_batch_axis(gamma)
-          
+        test_gamma = self.extract_grid_axis_from_batch_axis(gamma)              # TODO
         '''(batch_size*to_each_grid, from_each_grid, ...) -> (batch_size*to_each_grid, ...)'''
         predicted_now_states = self.integrate_phi_gamma(phi, gamma)
 
